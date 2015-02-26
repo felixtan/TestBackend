@@ -1,0 +1,5 @@
+{
+  "mongoose": {
+    "uri": "mongodb://admin:admin@ds053160.mongolab.com:53160/qwk-db"
+  }
+}
