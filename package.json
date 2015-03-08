@@ -1,12 +1,10 @@
 {
-  "name": "qwk-app",
-  "version": "0.4.0",
-  "private": true,
-  "description": "Online marketplace that makes it easy for shoppers to buy on impulse.",
+  "name": "test-app",
+  "version": "1.4.0",
+  "description": "Online marketplace application",
   "main": "server.js",
   "scripts": {
-    "start": "nodemon server.js",
-    "test": "mocha -recursive test/api"
+    "start": "nodemon server.js"
   },
   "author": "Felix Tan <tanf91@gmail.com>",
   "dependencies": {
@@ -18,7 +16,8 @@
     "multiparty": "^4.1.0",
     "nconf": "^0.7.1",
     "passport": "^0.2.1",
-    "q": "^1.1.2"
+    "q": "^1.1.2",
+    "winston": "^0.9.0"
   },
   "devDependencies": {
     "chai": "^1.10.0",

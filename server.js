@@ -37,7 +37,7 @@ var options = {
   }
 };
 
-var mongoconnectionUri = config.get('mongoose:uri');
+var mongoconnectionUri = config.db.mongodb;
 var mongooseUri = uriUtil.formatMongoose(mongoconnectionUri);
 mongoose.connect(mongooseUri, options);
 var connection = mongoose.connection;
@@ -49,7 +49,7 @@ connection.on('error', console.error.bind(console, 'connection error:'));
 connection.once('open', function() {
   console.log('Connected to ' + connection.name);
 
-  // Connection to qwk-db is an async operation so we wait for the connection to open before starting up the express server
+  // Connection to test-db is an async operation so we wait for the connection to open before starting up the express server
   app.listen(port, function() {
     console.log('Listening on port ' + port + ' in ' + mode + ' mode.');
   });
@@ -63,7 +63,7 @@ process.on('SIGINT', function() {
   });
 });
 
-// Upon disconnection from qwk-db
+// Upon disconnection from test-db
 connection.on('disconnected', function() {
   console.log('Mongoose ' + connection.name + ' connection closed');
   // TODO: log reason for db disconnection
@@ -128,38 +128,42 @@ app.get('/api/users/:id', function(req, res) {
 
 // POST/CREATE A NEW USER
 app.post('/api/users', function(req, res) {
-  var newUser = new User({
-    fbId: req.body.fbId,
-    email: req.body.email,
-    firstName: req.body.firstName,
-    lastName: req.body.lastName,
-    ageRange: req.body.ageRange,
-    birthday: req.body.birthday,
-    gender: req.body.gender,
-    education: req.body.education,
-    interests: req.body.interests,
-    relationshipStatus: req.body.relationshipStatus,
-    work: req.body.work,
-    hometown: req.body.hometown,
-    location: req.body.location,
-    languages: req.body.languages,
-    dateCreated: (new Date()).toUTCString()
-  });
+  var query = User.where({ email: req.body.email });
+  query.findOne(function(err, user) {
+    if(user) {
+      res.statusCode = 409;
+      return res.send({ errpr: 'User with the email already exists.'});
+    }
 
-  newUser.save(function(err) {
-    if(!err) {
-      res.statusCode = 201;
-      return res.send({ status: 'User ' + newUser.firstName + ' ' + newUser.lastName + ' was added.', user: newUser });
-    } else {
-      console.log(err);
-      if(err.name == 'ValidationError') {
-        res.statusCode = 400;
-        res.send({ error: 'Bad Request.' });
-      } else {
-        res.statusCode = 500;
-        res.send({ error: 'Server error.' });
-      }
-      console.log('Internal error(%d): %s.', res.statusCode, err.message);
+    if(!user) {
+      var newUser = new User({
+        fbId: req.body.fbId,
+        email: req.body.email,
+        firstName: req.body.firstName,
+        lastName: req.body.lastName,
+        ageRange: req.body.ageRange,
+        birthday: req.body.birthday,
+        gender: req.body.gender,
+        education: req.body.education,
+        interests: req.body.interests,
+        relationshipStatus: req.body.relationshipStatus,
+        work: req.body.work,
+        hometown: req.body.hometown,
+        location: req.body.location,
+        languages: req.body.languages,
+        dateCreated: (new Date()).toUTCString()
+      });
+
+      newUser.save(function(err) {
+        if(!err) {
+          res.statusCode = 201;
+          return res.send({ status: 'User ' + newUser.firstName + ' ' + newUser.lastName + ' was added.', user: newUser });
+        } else {
+            res.statusCode = 500;
+            return res.send({ error: 'Server error.' });
+            console.log('Internal error(%d): %s.', res.statusCode, err.message);
+        }
+      });
     }
   });
 });
@@ -174,8 +178,8 @@ app.put('/api/users/:id', function(req, res) {
 
     user.fbId = req.body.fbId;
     user.email = req.body.email;
-    user.firstName = req.body.firstName;
-    user.lastName = req.body.lastName;
+    firstName: req.body.firstName;
+    lastName: req.body.lastName;
     user.ageRange = req.body.ageRange;
     user.birthday = req.body.birthday;
     user.gender = req.body.gender;
@@ -190,7 +194,7 @@ app.put('/api/users/:id', function(req, res) {
 
     return user.save(function(err) {
       if(!err) {
-        return res.send({ status: 'User updated.', user: user });
+        return res.send({ user: user });
       } else {
         if(err.name == 'ValidationError') {
           res.statusCode = 400;
@@ -584,5 +588,9 @@ app.delete('/api/activities/:id', function(req, res) {
 
 // For testing
 module.exports = {
-  db: connection
+  db: connection,
+  app: app,
+  models: {
+    User: User
+  }
 }

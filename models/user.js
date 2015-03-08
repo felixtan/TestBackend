@@ -15,7 +15,10 @@ var User = new Schema({
     type: String,
     required: true
   },
-  lastName: String,
+  lastName: {
+    type: String,
+    required: true
+  },
   ageRange: Object,
   birthday: String,
   gender: String,

@@ -5,11 +5,11 @@ var mongoose = require('mongoose');
 var User     = require('../../models/user.js');
 
 describe('User API unit tests', function() {
-  describe('Testing the connection to qwk-db at Mongolab', function() {
-    it('Server should connect to qwk-db', function(done) {
+  describe('Testing the connection to test-db at Mongolab', function() {
+    it('Server should connect to test-db', function(done) {
       //console.log(app.db);
       expect(app.db).to.be.an('object');
-      expect(app.db.name).to.equal('qwk-db');
+      expect(app.db.name).to.equal('test-db');
       done();
     });
   });
