@@ -1,5 +1,0 @@
-{
-  "mongoose": {
-    "uri": "mongodb://admin:admin@ds031581.mongolab.com:31581/test-db"
-  }
-}

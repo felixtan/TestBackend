@@ -5,7 +5,13 @@ var Q              = require('q');
 var bodyParser     = require('body-parser');
 var multiparty     = require('multiparty');
 var bcrypt         = require('bcrypt');
+var logger         = require('morgan');
+const log          = require('npmlog');
 var passport       = require('passport');
+var GoogleStrategy = require('passport-google').Strategy;
+var session        = require('express-session');
+var cookieParser   = require('cookie-parser');
+var MongoStore     = require('connect-mongo')(session);
 var config         = require('./config.js');
 var User           = require('./models/user.js');
 var Item           = require('./models/item.js');
@@ -37,50 +43,105 @@ var options = {
   }
 };
 
-var mongoconnectionUri = config.db.mongodb;
-var mongooseUri = uriUtil.formatMongoose(mongoconnectionUri);
+var mongooseUri = uriUtil.formatMongoose(config.db.mongodb);
 mongoose.connect(mongooseUri, options);
 var connection = mongoose.connection;
 
-// DB connection error handling
-connection.on('error', console.error.bind(console, 'connection error:'));
-
+// Refer to the following article for Mongoose connection best practices
+// http://theholmesoffice.com/mongoose-connection-best-practice/
 // Upon successful connection
-connection.once('open', function() {
-  console.log('Connected to ' + connection.name);
+connection
+  .once('open', function() {
+    log.info('Connection to ' + connection.name + ' established');
 
-  // Connection to test-db is an async operation so we wait for the connection to open before starting up the express server
-  app.listen(port, function() {
-    console.log('Listening on port ' + port + ' in ' + mode + ' mode.');
+    // Connection to test-db is an async operation so we wait for the connection to open before starting up the express server
+    app.listen(port, function() {
+      log.info('Listening on port ' + port + ' in ' + mode + ' mode.');
+    });
+  })
+  // Upon disconnection from test-db
+  .on('disconnected', function() {
+    log.info('Connection to ' + connection.name + ' closed');
+    // TODO: log reason for db disconnection?
+  })
+  // DB connection error handling
+  .on('error', function(err) {
+    log.error('MongoDB', err.message);
   });
-});
 
-// Upon termination of the app
+// Upon ^C termination of the app
 process.on('SIGINT', function() {
   connection.close(function() {
-    console.log('Mongoose ' + connection.name + ' connection closed through app termination');
+    log.info('Connection to ' + connection.name + ' closed through app termination');
     process.exit(0);
   });
 });
 
-// Upon disconnection from test-db
-connection.on('disconnected', function() {
-  console.log('Mongoose ' + connection.name + ' connection closed');
-  // TODO: log reason for db disconnection
-});
-
 // MIDDLEWARE
+app.use(logger('dev'));
+app.use(cookieParser());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(session({
+  secret: 'trulyrandom',
+  cooke: { maxAge: 60000 },
+  resave: true,
+  saveUninitialized: true,
+  store: new MongoStore({
+    mongooseConnection: mongoose.connection
+  })
+}));
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Session data management
+passport.serializeUser(function(user, done) {
+  done(null, user.identifier);
+});
+passport.deserializeUser(function(id, done) {
+  done(null, { identifier: id });
+});
+
+passport.use(new GoogleStrategy({
+    returnURL: 'http://localhost:3000/auth/google/return',
+    realm: 'http://localhost:3000/'
+  },
+
+  /**
+    profile: will contain user profile information provided by Google
+  */
+  function(identifier, profile, done) {
+    profile = {
+      identifier: identifier
+    };
+    log.info('profile:\n', profile);
+    return done(null, profile);
+  }
+));
+
 // ROUTES
 app.get('/', function(req, res) {
-  res.send('This is the root.')
+  res.send('Awesome landing page')
 });
 app.get('/api', function(req, res) {
-  res.send('API is up and running.');
+  res.send('Awesome API is operational');
+});
+app.get('/login', function(req, res) {
+  res.send('Awesome login page');
+});
+app.get('/logout', function(req, res) {
+  res.send('You are now logged out. Thanks for using our awesome app!');
+});
+app.get('/auth/google', passport.authenticate('google'));
+app.get('/auth/google/return',
+  passport.authenticate('google', {
+    successRedirect: '/',
+    failureRedirect: '/login'
+  })
+);
+app.get('/auth/logout', function(req, res) {
+  req.logout();
+  res.redirect('/logout');
 });
 
 // USERS API /////////////////////////////////////////////
@@ -137,20 +198,9 @@ app.post('/api/users', function(req, res) {
 
     if(!user) {
       var newUser = new User({
-        fbId: req.body.fbId,
         email: req.body.email,
         firstName: req.body.firstName,
         lastName: req.body.lastName,
-        ageRange: req.body.ageRange,
-        birthday: req.body.birthday,
-        gender: req.body.gender,
-        education: req.body.education,
-        interests: req.body.interests,
-        relationshipStatus: req.body.relationshipStatus,
-        work: req.body.work,
-        hometown: req.body.hometown,
-        location: req.body.location,
-        languages: req.body.languages,
         dateCreated: (new Date()).toUTCString()
       });
 
@@ -176,20 +226,9 @@ app.put('/api/users/:id', function(req, res) {
       return res.send({ error: 'User not found.' });
     }
 
-    user.fbId = req.body.fbId;
     user.email = req.body.email;
-    firstName: req.body.firstName;
-    lastName: req.body.lastName;
-    user.ageRange = req.body.ageRange;
-    user.birthday = req.body.birthday;
-    user.gender = req.body.gender;
-    user.education = req.body.education;
-    user.interests = req.body.interests;
-    user.relationshipStatus = req.body.relationshipStatus;
-    user.work = req.body.work;
-    user.hometown = req.body.hometown;
-    user.location = req.body.location;
-    user.languages = req.body.languages;
+    user.firstName = req.body.firstName;
+    user.lastName = req.body.lastName;
     user.lastUpdated = (new Date()).toUTCString();
 
     return user.save(function(err) {
